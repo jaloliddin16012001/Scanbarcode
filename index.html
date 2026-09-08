@@ -9,6 +9,7 @@
   :root{
     --bg: #0B0E12;
     --surface: #12161C;
+    --surface-2: #171C24;
     --line: #232A33;
     --text: #EDF1F5;
     --muted: #7C8794;
@@ -23,6 +24,7 @@
     color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
     -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
   }
   .wrap {
     max-width: 480px;
@@ -98,7 +100,6 @@
     flex-shrink: 0;
     transition: background 0.2s;
   }
-  .status.saving .dot { background: #E8B93F; }
   .status.saved .dot { background: var(--laser); }
   .status.error .dot { background: var(--error); }
   .status.saved span.msg { color: var(--text); }
@@ -153,6 +154,126 @@
     padding: 1px 5px;
     border-radius: 4px;
   }
+
+  /* ===== Pastki tasdiqlash oynasi (bottom sheet) ===== */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 50;
+  }
+  .overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .sheet {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    background: var(--surface-2);
+    border-top: 1px solid var(--line);
+    border-radius: 20px 20px 0 0;
+    padding: 10px 18px calc(20px + env(safe-area-inset-bottom));
+    transform: translateY(100%);
+    transition: transform 0.25s cubic-bezier(.32,.72,0,1);
+    z-index: 51;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  .sheet.open { transform: translateY(0); }
+  .sheet .handle {
+    width: 36px; height: 4px;
+    background: var(--line);
+    border-radius: 2px;
+    margin: 6px auto 16px;
+  }
+  .sheet .label {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .sheet .scanned-code {
+    font-family: "SF Mono", "Menlo", "Consolas", monospace;
+    font-size: 18px;
+    font-weight: 600;
+    word-break: break-all;
+    margin-bottom: 4px;
+  }
+  .sheet .scanned-format {
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+  .qty-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 22px;
+  }
+  .qty-row .label { margin-bottom: 0; font-size: 14px; color: var(--text); }
+  .qty-control {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .qty-control button {
+    width: 42px; height: 42px;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-size: 20px;
+    line-height: 1;
+  }
+  .qty-control input {
+    width: 52px;
+    height: 42px;
+    text-align: center;
+    background: transparent;
+    border: none;
+    border-left: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+    color: var(--text);
+    font-size: 16px;
+    font-variant-numeric: tabular-nums;
+    -moz-appearance: textfield;
+  }
+  .qty-control input::-webkit-outer-spin-button,
+  .qty-control input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .sheet-actions {
+    display: flex;
+    gap: 10px;
+  }
+  .btn {
+    flex: 1;
+    padding: 14px;
+    border-radius: 12px;
+    border: none;
+    font-size: 15px;
+    font-weight: 600;
+    text-align: center;
+  }
+  .btn-cancel {
+    background: var(--surface);
+    color: var(--muted);
+    border: 1px solid var(--line);
+    flex: 0 0 auto;
+    padding: 14px 18px;
+  }
+  .btn-send {
+    background: var(--laser);
+    color: #08130D;
+  }
+  .btn-send:active { opacity: 0.85; }
+  .btn-send:disabled { opacity: 0.5; }
 </style>
 </head>
 <body>
@@ -178,25 +299,55 @@
     </div>
 
     <div class="history">
-      <h2>So'nggi skanerlar</h2>
-      <div id="log"><div class="empty">Hali hech narsa skanerlanmadi</div></div>
+      <h2>Yuborilgan kodlar</h2>
+      <div id="log"><div class="empty">Hali hech narsa yuborilmadi</div></div>
+    </div>
+  </div>
+
+  <!-- Pastki tasdiqlash oynasi -->
+  <div class="overlay" id="overlay"></div>
+  <div class="sheet" id="sheet">
+    <div class="handle"></div>
+    <div class="label">Skanerlangan kod</div>
+    <div class="scanned-code" id="sheetCode">—</div>
+    <div class="scanned-format" id="sheetFormat">&nbsp;</div>
+
+    <div class="qty-row">
+      <div class="label">Soni</div>
+      <div class="qty-control">
+        <button type="button" id="qtyMinus">−</button>
+        <input type="number" id="qtyInput" value="1" min="1" inputmode="numeric">
+        <button type="button" id="qtyPlus">+</button>
+      </div>
+    </div>
+
+    <div class="sheet-actions">
+      <button class="btn btn-cancel" id="btnCancel">Bekor qilish</button>
+      <button class="btn btn-send" id="btnSend">Yuborish</button>
     </div>
   </div>
 
 <script>
   // ====== SHUNI O'ZGARTIRING ======
-  // Apps Script'ni Deploy qilgandan keyin olgan /exec havolangizni shu yerga qo'ying
   const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzE5qF4vST5KKlwOIM46p_qFlnJjR9sxcSf8jTvGt4VT6aP32HDqLDP0_5pygBMr_RX0Q/exec";
   // =================================
 
-  let lastCode = "";
-  let lastTime = 0;
   let count = 0;
+  let sheetOpen = false;
+  let pendingCode = "";
+  let pendingFormat = "";
 
   const statusEl = document.getElementById('status');
   const statusMsg = statusEl.querySelector('.msg');
   const logEl = document.getElementById('log');
   const countEl = document.getElementById('count');
+
+  const overlay = document.getElementById('overlay');
+  const sheet = document.getElementById('sheet');
+  const sheetCode = document.getElementById('sheetCode');
+  const sheetFormat = document.getElementById('sheetFormat');
+  const qtyInput = document.getElementById('qtyInput');
+  const btnSend = document.getElementById('btnSend');
 
   if (APPS_SCRIPT_URL.indexOf('YOUR_APPS_SCRIPT') !== -1) {
     document.getElementById('setupWarning').innerHTML =
@@ -208,40 +359,81 @@
     statusMsg.textContent = text;
   }
 
+  // ---- Skanerlash ----
   function onScanSuccess(decodedText, decodedResult) {
-    const now = Date.now();
-    if (decodedText === lastCode && now - lastTime < 3000) return;
-    lastCode = decodedText;
-    lastTime = now;
+    if (sheetOpen) return; // oyna ochiq bo'lsa, yangi skanerni e'tiborsiz qoldiramiz
 
     const format = (decodedResult && decodedResult.result && decodedResult.result.format)
       ? decodedResult.result.format.formatName
       : "";
 
-    setStatus('saving', 'Saqlanmoqda...');
-    sendToSheet(decodedText, format);
+    pendingCode = decodedText;
+    pendingFormat = format;
+    openSheet();
   }
 
-  function sendToSheet(code, format) {
-    // Apps Script CORS bilan cheklangan bo'lgani uchun "no-cors" rejimida
-    // yuboramiz: so'rov yetib boradi, lekin javobni o'qiy olmaymiz.
-    // Shuning uchun natijani optimistik tarzda "saqlandi" deb ko'rsatamiz.
+  function onScanError() { /* freym sayin xato normal */ }
+
+  // ---- Pastki oyna ----
+  function openSheet() {
+    sheetOpen = true;
+    sheetCode.textContent = pendingCode;
+    sheetFormat.textContent = pendingFormat || '\u00A0';
+    qtyInput.value = 1;
+    overlay.classList.add('open');
+    sheet.classList.add('open');
+  }
+
+  function closeSheet() {
+    sheetOpen = false;
+    overlay.classList.remove('open');
+    sheet.classList.remove('open');
+  }
+
+  document.getElementById('btnCancel').addEventListener('click', closeSheet);
+  overlay.addEventListener('click', closeSheet);
+
+  document.getElementById('qtyMinus').addEventListener('click', function () {
+    const v = Math.max(1, (parseInt(qtyInput.value, 10) || 1) - 1);
+    qtyInput.value = v;
+  });
+  document.getElementById('qtyPlus').addEventListener('click', function () {
+    const v = (parseInt(qtyInput.value, 10) || 1) + 1;
+    qtyInput.value = v;
+  });
+
+  btnSend.addEventListener('click', function () {
+    const quantity = Math.max(1, parseInt(qtyInput.value, 10) || 1);
+    btnSend.disabled = true;
+    btnSend.textContent = 'Yuborilmoqda...';
+
+    sendToSheet(pendingCode, pendingFormat, quantity, function () {
+      btnSend.disabled = false;
+      btnSend.textContent = 'Yuborish';
+      closeSheet();
+    });
+  });
+
+  // ---- Google Sheetsga yuborish ----
+  function sendToSheet(code, format, quantity, done) {
     fetch(APPS_SCRIPT_URL, {
       method: 'POST',
       mode: 'no-cors',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ code: code, format: format })
+      body: JSON.stringify({ code: code, format: format, quantity: quantity })
     })
-    .then(function() {
-      setStatus('saved', 'Saqlandi');
-      addRow(code, format);
+    .then(function () {
+      setStatus('saved', 'Yuborildi');
+      addRow(code, format, quantity);
+      done();
     })
-    .catch(function(err) {
+    .catch(function () {
       setStatus('error', 'Xatolik: internetni tekshiring');
+      done();
     });
   }
 
-  function addRow(code, format) {
+  function addRow(code, format, quantity) {
     if (count === 0) logEl.innerHTML = '';
     count++;
     countEl.textContent = count + " ta kod";
@@ -250,7 +442,7 @@
     row.className = 'row';
     const time = new Date().toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
     row.innerHTML =
-      '<span class="code">' + escapeHtml(code) + '</span>' +
+      '<span class="code">' + escapeHtml(code) + ' × ' + quantity + '</span>' +
       '<span class="meta">' + time + (format ? ' · ' + format : '') + '</span>';
     logEl.prepend(row);
   }
@@ -260,8 +452,6 @@
     d.textContent = str;
     return d.innerHTML;
   }
-
-  function onScanError() { /* freym sayin xato normal, e'tiborsiz qoldiramiz */ }
 
   const scanner = new Html5QrcodeScanner(
     "reader",
